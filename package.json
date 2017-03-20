@@ -1,0 +1,27 @@
+{
+  "name": "type-orm",
+  "version": "1.0.0",
+  "description": "something about orm",
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tianlinle/type-orm.git"
+  },
+  "keywords": [
+    "orm"
+  ],
+  "author": "wangtianlin",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tianlinle/type-orm/issues"
+  },
+  "homepage": "https://github.com/tianlinle/type-orm#readme",
+  "dependencies": {
+    "@types/node": "^7.0.8",
+    "mysql2": "^1.2.0"
+  }
+}

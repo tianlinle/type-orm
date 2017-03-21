@@ -1,6 +1,7 @@
 import { Literal } from './Literal';
 
 export class Column {
+    name: string;
     type: string;
     null: boolean;
     default: any;
@@ -9,6 +10,8 @@ export class Column {
 
     static initiate(type: string, option?: { null?: boolean, default?: any, extra?: Literal, comment?: string }) {
         let column = new Column();
+        let defaultOption = { null: true, default: null };
+        option = Object.assign(defaultOption, option);
         column.type = type;
         column.null = option.null;
         column.default = option.default;

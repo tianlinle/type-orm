@@ -1,5 +1,7 @@
-import { AdminModel } from './AdminModel';
-import { Migration } from '../classes/Migration';
+class A {
 
-let m = new Migration(AdminModel);
-console.log(m.getDefinedColumns());
+}
+
+class B {
+    static p = new A
+}

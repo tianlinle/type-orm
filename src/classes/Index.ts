@@ -3,8 +3,9 @@ import { Column } from './Column';
 type IndexType = 'PRIMARY' | 'UNIQUE' | 'INDEX';
 
 export class Index {
+    name: string;
     type: IndexType;
-    columns: Column[];
+    columns: Column[] = [];
 
     static initiate(type: IndexType, columns: Column | Column[]) {
         let index = new Index();

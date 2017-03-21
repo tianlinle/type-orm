@@ -3,13 +3,18 @@ import { Model } from '../classes/Model';
 import { Index } from '../classes/Index';
 
 export class AdminModel extends Model {
-    static ID = Column.increment();
-    static NAME = Column.char({ length: 8 });
-    static PASSWORD = Column.char({ length: 255 });
-    static CREATED_TIME = Column.created();
-    static UPDATED_TIME = Column.updated();
+    static readonly COLUMNS = {
+        ID: Column.increment(),
+        NAME: Column.char({ length: 8 }),
+        PASSWORD: Column.char({ length: 255 }),
+        CREATED_TIME: Column.created(),
+        UPDATED_TIME: Column.updated()
+    };
 
-    static indexes = [Index.primary(AdminModel.ID), Index.unique(AdminModel.NAME)];
+    static readonly INDEXES = [
+        Index.primary(AdminModel.COLUMNS.ID),
+        Index.unique(AdminModel.COLUMNS.NAME)
+    ];
 
     id; name; password; createdTime; updatedTime;
 }

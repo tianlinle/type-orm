@@ -1,7 +1,6 @@
-class A {
+import { Migration } from '../classes/Migration';
+import { Connection } from '../classes/Connection';
 
-}
-
-class B {
-    static p = new A
-}
+let mysqlConfig = require('../../mysql.json');
+let connection = new Connection(mysqlConfig);
+console.log(mysqlConfig);

@@ -14,14 +14,76 @@ export class Migration {
         this.query = query;
     }
 
-    getDefinedColumns() {
-        let columns = {};
-        for (let i in this.query.modelClass) {
-            if (this.query.modelClass[i] instanceof Column) {
-                columns[i.toLowerCase()] = this.query.modelClass[i];
+    async migrate() {
+        let [descTableResults] = await this.query.connection.execute('SELECT * FROM information_schema.columns WHERE table_schema=' + Query.quoteValue(this.query.connection.connectionConfig.database) + ' AND table_name=' + Query.quoteColumn(this.query.modelClass.TABLE_NAME));
+
+        if (descTableResults.length <= 0) {
+
+        }
+
+        let definedColumnMap: { [index: string]: Column } = {};
+        let alterParts: string[] = [];
+        for (let field in this.query.modelClass.COLUMNS) {
+            let column = this.query.modelClass.COLUMNS[field];
+            definedColumnMap[column.name] = column;
+        }
+
+        let existedColumnMap: { [index: string]: DescTableResult };
+        for (let i in descTableResults) {
+            let row: DescTableResult = descTableResults[i];
+            existedColumnMap[row.COLUMN_NAME] = row;
+            if (!this.query.modelClass.COLUMNS[row.COLUMN_NAME]) {
+                alterParts.push('DROP COLUMN ' + Query.quoteColumn(row.COLUMN_NAME));
             }
         }
-        return columns;
+
+        for (let i in definedColumnMap) {
+            let definedColumn = definedColumnMap[i];
+            if (!existedColumnMap[definedColumn.name]) {
+                alterParts.push('ADD COLUMN ' + Migration.getColumnStatement(definedColumn));
+            } else {
+                let existedColumn = existedColumnMap[definedColumn.name];
+                if (existedColumn.COLUMN_TYPE != definedColumn.type ||
+                    existedColumn.COLUMN_COMMENT != definedColumn.comment ||
+                    !Literal.isEqual(existedColumn.COLUMN_DEFAULT, definedColumn.default) ||
+                    !Literal.isEqual(existedColumn.EXTRA, definedColumn.extra) ||
+                    (existedColumn.IS_NULLABLE == 'YES') != definedColumn.null) {
+                    alterParts.push('CHANGE COLUMN ' + Query.quoteColumn(existedColumn.COLUMN_NAME) + ' ' + Migration.getColumnStatement(definedColumn));
+                }
+            }
+        }
+    }
+
+    async create() {
+        let columnParts: string[] = [];
+        for (let i in this.query.modelClass.COLUMNS) {
+            columnParts.push(Migration.getColumnStatement(this.query.modelClass.COLUMNS[i]));
+        }
+        for (let i in this.query.modelClass.INDEXES) {
+
+        }
+    }
+
+    static getIndexStatement(index: Index) {
+        let statement: string = '';
+
+    }
+
+    static getColumnStatement(column: Column) {
+        let parts: string[] = [];
+        parts.push(Query.quoteColumn(column.name));
+        parts.push(column.type);
+        parts.push(column.null ? 'NULL' : 'NOT NULL');
+        if (column.default !== undefined) {
+            parts.push('DEFAULT ' + Query.quoteValue(column.default));
+        }
+        if (column.extra) {
+            parts.push(Query.quoteValue(column.extra));
+        }
+        if (column.comment) {
+            parts.push('COMMENT ' + Query.quoteValue(column.comment));
+        }
+        return parts.join(' ');
     }
 
     async getExistedIndexes() {

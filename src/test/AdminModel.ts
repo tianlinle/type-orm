@@ -5,8 +5,8 @@ import { Index } from '../classes/Index';
 export class AdminModel extends Model {
     static readonly COLUMNS = {
         ID: Column.increment(),
-        NAME: Column.char({ length: 8 }),
-        PASSWORD: Column.char({ length: 255 }),
+        NAME: Column.char({ length: 8, null: false }),
+        PASSWORD: Column.char({ length: 255, null: false }),
         CREATED_TIME: Column.created(),
         UPDATED_TIME: Column.updated()
     };

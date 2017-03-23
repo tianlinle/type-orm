@@ -14,8 +14,15 @@ export class Migration {
         this.query = query;
     }
 
+    async migrate() {
+        let sql: string = await this.showMigrate();
+        if (sql != '') {
+            await this.query.connection.execute(sql);
+        }
+    }
+
     async showMigrate(): Promise<string> {
-        let [descTableResults] = await this.query.connection.execute('SELECT * FROM information_schema.columns WHERE table_schema=' + Query.quoteValue(this.query.connection.connectionConfig.database) + ' AND table_name=' + Query.quoteColumn(this.query.modelClass.TABLE_NAME));
+        let [descTableResults] = await this.query.connection.execute('SELECT * FROM information_schema.columns WHERE table_schema=' + Query.quoteValue(this.query.connection.connectionConfig.database) + ' AND table_name=' + Query.quoteValue(this.query.modelClass.TABLE_NAME));
         let sql = '';
         if (descTableResults.length <= 0) {
             sql = await this.showCreateTable();
@@ -27,11 +34,11 @@ export class Migration {
                 definedColumnMap[column.name] = column;
             }
 
-            let existedColumnMap: { [index: string]: DescTableResult };
+            let existedColumnMap: { [index: string]: DescTableResult } = {};
             for (let i in descTableResults) {
                 let row: DescTableResult = descTableResults[i];
                 existedColumnMap[row.COLUMN_NAME] = row;
-                if (!this.query.modelClass.COLUMNS[row.COLUMN_NAME]) {
+                if (!definedColumnMap[row.COLUMN_NAME]) {
                     alterParts.push('DROP COLUMN ' + Query.quoteColumn(row.COLUMN_NAME));
                 }
             }
@@ -42,9 +49,10 @@ export class Migration {
                     alterParts.push('ADD COLUMN ' + Migration.getColumnStatement(definedColumn));
                 } else {
                     let existedColumn = existedColumnMap[definedColumn.name];
+                    let definedColumnDefault = definedColumn.default === undefined ? null : definedColumn.default;
                     if (existedColumn.COLUMN_TYPE != definedColumn.type ||
                         existedColumn.COLUMN_COMMENT != definedColumn.comment ||
-                        !Literal.isEqual(existedColumn.COLUMN_DEFAULT, definedColumn.default) ||
+                        !Literal.isEqual(existedColumn.COLUMN_DEFAULT, definedColumnDefault) ||
                         !Literal.isEqual(existedColumn.EXTRA, definedColumn.extra) ||
                         (existedColumn.IS_NULLABLE == 'YES') != definedColumn.null) {
                         alterParts.push('CHANGE COLUMN ' + Query.quoteColumn(existedColumn.COLUMN_NAME) + ' ' + Migration.getColumnStatement(definedColumn));
@@ -74,9 +82,9 @@ export class Migration {
                     existedIndexKeys[row.Key_name] = 'PRIMARY';
                 } else {
                     if (!existedIndexKeys[row.Key_name]) {
-                        existedIndexKeys[row.Key_name] = row.Non_unique == '0' ? 'idx' : 'uni';
+                        existedIndexKeys[row.Key_name] = row.Non_unique == '0' ? 'uni' : 'idx';
                     }
-                    existedIndexKeys[row.Key_name] += row.Column_name;
+                    existedIndexKeys[row.Key_name] += '_' + row.Column_name;
                 }
             }
             let existedIndexNames = {};
@@ -96,7 +104,7 @@ export class Migration {
 
             for (let keyName in definedIndexNames) {
                 if (!existedIndexNames[keyName]) {
-                    let index: Index = existedIndexNames[keyName];
+                    let index: Index = definedIndexNames[keyName];
                     let indexType: string = index.type == 'PRIMARY' ? 'PRIMARY KEY' : (index.type == 'UNIQUE' ? 'UNIQUE INDEX' : 'INDEX');
                     let columnParts: string[] = [];
                     for (let column of index.columns) {
@@ -106,7 +114,7 @@ export class Migration {
                 }
             }
             if (alterParts.length > 0) {
-                sql = 'CREATE TABLE ' + this.query.modelClass.TABLE_NAME + ' (' + alterParts.join(', ') + ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4';
+                sql = 'ALTER TABLE ' + this.query.modelClass.TABLE_NAME + ' ' + alterParts.join(', ');
             }
         }
         return sql;
@@ -154,39 +162,5 @@ export class Migration {
             parts.push('COMMENT ' + Query.quoteValue(column.comment));
         }
         return parts.join(' ');
-    }
-
-    async getExistedIndexes() {
-        let [indexResult] = await this.query.connection.execute('SHOW INDEX FROM ' + this.query.modelClass.TABLE_NAME);
-        let existsIndexes: { [index: string]: Index } = {};
-        for (let i in indexResult) {
-            let row: ShowIndexResult = indexResult[i];
-            if (!existsIndexes[row.Key_name]) {
-                let index = new Index();
-                index.name = row.Key_name;
-                index.type = row.Key_name == 'PRIMARY' ? 'PRIMARY' : (row.Non_unique == '0' ? 'UNIQUE' : 'INDEX');
-                index.columns.push();
-                existsIndexes[row.Key_name] = index;
-            }
-            let index = new Index();
-            index.name = row.Key_name;
-        }
-    }
-
-    async getExistedColumns() {
-        let [descTableResult] = await this.query.connection.execute('SELECT * FROM information_schema.columns WHERE table_schema=' + Query.quoteValue(this.query.connection.connectionConfig.database) + ' AND table_name=' + Query.quoteColumn(this.query.modelClass.TABLE_NAME));
-        let existedColumns: { [index: string]: Column } = {};
-        for (let i in descTableResult) {
-            let row: DescTableResult = descTableResult[i];
-            let column: Column = new Column();
-            column.name = row.COLUMN_NAME;
-            column.type = row.COLUMN_TYPE;
-            column.null = row.IS_NULLABLE == 'YES';
-            column.default = row.COLUMN_DEFAULT;
-            column.extra = new Literal(row.EXTRA);
-            column.comment = row.COLUMN_COMMENT;
-            existedColumns[column.name] = column;
-        }
-        return existedColumns;
     }
 }

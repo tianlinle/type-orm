@@ -1,9 +1,8 @@
 import { Column } from './Column';
 
-type IndexType = 'PRIMARY' | 'UNIQUE' | 'INDEX';
+type IndexType = 'UNIQUE' | 'INDEX';
 
 export class Index {
-    name: string;
     type: IndexType;
     columns: Column[] = [];
 
@@ -20,9 +19,5 @@ export class Index {
 
     static unique(columns: Column | Column[]) {
         return this.initiate('UNIQUE', columns);
-    }
-
-    static primary(column: Column) {
-        return this.initiate('PRIMARY', column);
     }
 }

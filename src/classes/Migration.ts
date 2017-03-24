@@ -5,7 +5,7 @@ import { Literal } from './Literal';
 import { Index } from './Index';
 
 type DescTableResult = { COLUMN_NAME: string, COLUMN_TYPE: string, IS_NULLABLE: string, COLUMN_DEFAULT: string, EXTRA: string, COLUMN_COMMENT: string };
-type ShowIndexResult = { Column_name: string, Non_unique: '0' | '1', Key_name: string };
+type ShowIndexResult = { INDEX_NAME: string, KEY_NAME: string };
 
 export class Migration {
     query: Query;
@@ -62,50 +62,40 @@ export class Migration {
 
             let definedIndexNames = {};
             for (let index of this.query.modelClass.INDEXES) {
-                let name: string;
-                if (index.type == 'PRIMARY') {
-                    name = 'PRIMARY';
-                } else {
-                    name = index.type == 'UNIQUE' ? 'uni' : 'idx';
-                    for (let column of index.columns) {
-                        name += '_' + column.name;
-                    }
+                let name: string = index.type == 'UNIQUE' ? '0' : '1';
+                for (let column of index.columns) {
+                    name += '_' + column.name;
                 }
                 definedIndexNames[name] = index;
             }
 
-            let existedIndexKeys = {};
-            let [indexResults] = await this.query.connection.execute('SHOW INDEX FROM ' + this.query.modelClass.TABLE_NAME);
+            let existedIndexNames = {};
+            let existedPrimary: string;
+            let [indexResults] = await this.query.connection.execute(`SELECT INDEX_NAME, concat(non_unique, '_', group_concat(column_name separator '_')) as KEY_NAME FROM information_schema.statistics where table_schema=${Query.quoteValue(this.query.connection.connectionConfig.database)} AND table_name=${Query.quoteValue(this.query.modelClass.TABLE_NAME)} group by index_name`);
             for (let i in indexResults) {
                 let row: ShowIndexResult = indexResults[i];
-                if (row.Key_name == 'PRIMARY') {
-                    existedIndexKeys[row.Key_name] = 'PRIMARY';
+                if (row.INDEX_NAME == 'PRIMARY') {
+                    existedPrimary = row.KEY_NAME;
                 } else {
-                    if (!existedIndexKeys[row.Key_name]) {
-                        existedIndexKeys[row.Key_name] = row.Non_unique == '0' ? 'uni' : 'idx';
-                    }
-                    existedIndexKeys[row.Key_name] += '_' + row.Column_name;
+                    existedIndexNames[row.KEY_NAME] = row.INDEX_NAME;
                 }
             }
-            let existedIndexNames = {};
-            for (let i in existedIndexKeys) {
-                existedIndexNames[existedIndexKeys[i]] = i;
+
+            if ('0_' + this.query.modelClass.PRIMARY_COLUMN.name != existedPrimary) {
+                alterParts.push('DROP PRIMARY KEY');
+                alterParts.push('ADD PRIMARY KEY (' + Query.quoteColumn(this.query.modelClass.PRIMARY_COLUMN.name) + ')');
             }
 
             for (let keyName in existedIndexNames) {
                 if (!definedIndexNames[keyName]) {
-                    if (keyName == 'PRIMARY') {
-                        alterParts.push('DROP PRIMARY KEY');
-                    } else {
-                        alterParts.push('DROP INDEX ' + existedIndexNames[keyName]);
-                    }
+                    alterParts.push('DROP INDEX ' + existedIndexNames[keyName]);
                 }
             }
 
             for (let keyName in definedIndexNames) {
                 if (!existedIndexNames[keyName]) {
                     let index: Index = definedIndexNames[keyName];
-                    let indexType: string = index.type == 'PRIMARY' ? 'PRIMARY KEY' : (index.type == 'UNIQUE' ? 'UNIQUE INDEX' : 'INDEX');
+                    let indexType: string = index.type == 'UNIQUE' ? 'UNIQUE INDEX' : 'INDEX';
                     let columnParts: string[] = [];
                     for (let column of index.columns) {
                         columnParts.push(Query.quoteColumn(column.name));
@@ -128,6 +118,7 @@ export class Migration {
         for (let i in this.query.modelClass.INDEXES) {
             columnParts.push(Migration.getIndexStatement(this.query.modelClass.INDEXES[i]));
         }
+        columnParts.push('PRIMARY KEY (' + Query.quoteColumn(this.query.modelClass.PRIMARY_COLUMN.name) + ')');
         return 'CREATE TABLE ' + Query.quoteColumn(this.query.modelClass.TABLE_NAME) + '(' + columnParts.join(', ') + ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4';
     }
 
@@ -137,14 +128,10 @@ export class Migration {
         for (let column of index.columns) {
             parts.push(Query.quoteColumn(column.name));
         }
-        switch (index.type) {
-            case 'PRIMARY':
-                return 'PRIMARY KEY (' + parts.join(', ') + ')';
-            case 'UNIQUE':
-                return 'UNIQUE INDEX (' + parts.join(', ') + ')';
-            default:
-                return statement = 'INDEX (' + parts.join(', ') + ')';
+        if (index.type == 'UNIQUE') {
+            return 'UNIQUE INDEX (' + parts.join(', ') + ')';
         }
+        return statement = 'INDEX (' + parts.join(', ') + ')';
     }
 
     static getColumnStatement(column: Column) {
@@ -152,7 +139,7 @@ export class Migration {
         parts.push(Query.quoteColumn(column.name));
         parts.push(column.type);
         parts.push(column.null ? 'NULL' : 'NOT NULL');
-        if (column.default !== undefined) {
+        if (!(column.default === null && !column.null)) {
             parts.push('DEFAULT ' + Query.quoteValue(column.default));
         }
         if (column.extra) {

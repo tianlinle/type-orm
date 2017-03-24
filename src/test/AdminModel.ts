@@ -12,7 +12,6 @@ export class AdminModel extends Model {
     };
 
     static readonly INDEXES = [
-        Index.primary(AdminModel.COLUMNS.ID),
         Index.unique(AdminModel.COLUMNS.NAME)
     ];
 

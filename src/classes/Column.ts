@@ -2,6 +2,7 @@ import { Literal } from './Literal';
 import { Query } from './Query';
 
 export class Column {
+    property: string;
     name: string;
     type: string;
     null: boolean;
@@ -95,7 +96,7 @@ export class Column {
         option = Object.assign(defaultOption, option);
         column.type = type;
         column.null = option.null;
-        column.default = option.default === undefined ? null : option.default;
+        column.default = option.default;
         column.extra = option.extra === undefined ? new Literal('') : option.extra;
         column.comment = option.comment ? option.comment : '';
         return column;

@@ -18,3 +18,8 @@ process.on('unhandledRejection', (reason, p) => {
     console.log("Unhandled Rejection at: Promise ", p, " reason: ", reason);
     // application specific logging, throwing an error, or other logic here
 });
+
+(async () => {
+    let result = await connection.execute('update tb_admin set name="111"');
+    console.log(result);
+})();

@@ -16,7 +16,7 @@ export class Connection {
         }
     }
 
-    query(modelClass: typeof Model): Query {
+    query<T extends Model>(modelClass: { new (query): T } & typeof Model) {
         return new Query(this, modelClass);
     }
 

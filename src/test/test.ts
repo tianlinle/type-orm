@@ -1,6 +1,7 @@
 import { Migration } from '../classes/Migration';
 import { Connection } from '../classes/Connection';
 import { AdminModel } from './AdminModel';
+import { Query } from '../classes/Query';
 
 let mysqlConfig = require('../../mysql.json');
 let connection = new Connection(mysqlConfig);
@@ -20,6 +21,9 @@ process.on('unhandledRejection', (reason, p) => {
 });
 
 (async () => {
-    let result = await connection.execute('update tb_admin set name="111"');
-    console.log(result);
+    let query = new Query(connection, AdminModel);
+    let result = await connection.query(AdminModel).where(AdminModel.COLUMNS.NAME.eq('1112')).find();
+    let row = result[0];
+    row.password = 'hahaha6';
+    row.save();
 })();

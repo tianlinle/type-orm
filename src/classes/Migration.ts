@@ -8,9 +8,9 @@ type DescTableResult = { COLUMN_NAME: string, COLUMN_TYPE: string, IS_NULLABLE: 
 type ShowIndexResult = { INDEX_NAME: string, KEY_NAME: string };
 
 export class Migration {
-    query: Query;
+    query: Query<Model>;
 
-    constructor(query: Query) {
+    constructor(query: Query<Model>) {
         this.query = query;
     }
 

@@ -2,8 +2,10 @@ import { Column } from './Column';
 import { Index } from './Index';
 import { StringUtil } from './StringUtil';
 import { Query } from './Query';
+import { ColumnValue } from './ColumnValue';
 
-const q = Symbol();
+const q = Symbol('query');
+const r = Symbol('raw');
 
 export class Model {
     static INDEXES: Index[] = [];
@@ -11,14 +13,33 @@ export class Model {
     static TABLE_NAME;
     static PRIMARY_COLUMN: Column;
 
-    constructor(query: Query) {
+    constructor(query) {
         this[q] = query;
     }
 
-    save() {
-        if (this[(this.constructor as typeof Model).PRIMARY_COLUMN.property]) {
+    migrate(row) {
+        let modelClass = this.constructor as typeof Model;
+        this[r] = {};
+        for (let columnName in row) {
+            let propertyName = modelClass.propertyName(columnName);
+            this[propertyName] = this[r][columnName] = row[columnName];
+        }
+    }
 
+    async save() {
+        let modelClass = this.constructor as typeof Model;
+        if (this[modelClass.PRIMARY_COLUMN.property]) {
+            let updated = [];
+            for (let columnName in this[r]) {
+                let propertyName = modelClass.propertyName(columnName);
+                if (this[r][columnName] != this[propertyName] && this[propertyName] !== undefined) {
+                    updated.push(new ColumnValue(columnName, this[propertyName]));
+                    this[r][columnName] = this[propertyName];
+                }
+            }
+            await this[q].connection.query(this.constructor as typeof Model).where(modelClass.PRIMARY_COLUMN.eq(this[modelClass.PRIMARY_COLUMN.property])).update(updated);
         } else {
+
         }
     }
 

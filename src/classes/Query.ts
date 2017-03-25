@@ -4,17 +4,18 @@ import * as mysql from 'mysql2';
 import { Literal } from './Literal';
 import { Column } from './Column';
 import { Result } from './Result';
+import { ColumnValue } from './ColumnValue';
 
 type ResultSetHeader = { fieldCount: number, affectedRows: number, insertId: number, info: string, serverStatus: number, warningStatus: 0, changedRows: 0 };
+type UpdateResult = { affectedRows: number, changedRows: number };
 
-export class Query {
-    modelClass: typeof Model;
+export class Query<T extends Model> {
     connection: Connection;
-    protected whereClause: string;
+    protected whereClause: string = '';
     protected orderList: string[] = [];
     protected limitOffset: string;
 
-    constructor(connection: Connection, modelClass: typeof Model) {
+    constructor(connection: Connection, public modelClass: { new (query): T } & typeof Model) {
         modelClass.init();
         this.connection = connection;
         this.modelClass = modelClass;
@@ -38,17 +39,20 @@ export class Query {
         return this;
     }
 
-    async update(valueMap: { [index: string]: any }) {
-        let parts: string[] = [];
-        for (let property in valueMap) {
-            parts.push(Query.quoteColumn(this.modelClass.columnName(property)) + ' = ' + Query.quoteValue(valueMap[property]));
-        }
-        if (parts.length > 0) {
-            let sql = 'UPDATE ' + this.modelClass.TABLE_NAME + ' SET ' + parts.join(', ') + ' WHERE ' + this.whereClause;
+    async update(pairs: ColumnValue[]): Promise<UpdateResult> {
+        if (pairs.length > 0) {
+            let parts: string[] = [];
+            for (let p of pairs) {
+                parts.push(Query.quoteColumn(p.columnName) + ' = ' + Query.quoteValue(p.value));
+            }
+            let sql = 'UPDATE ' + this.modelClass.TABLE_NAME + ' SET ' + parts.join(', ');
+            if (this.whereClause) {
+                sql += ' WHERE ' + this.whereClause;
+            }
             let [header] = await this.connection.execute(sql);
-            header as ResultSetHeader;
+            return { affectedRows: (header as ResultSetHeader).affectedRows, changedRows: (header as ResultSetHeader).changedRows };
         }
-        return 0;
+        return { affectedRows: 0, changedRows: 0 };
     }
 
     async count() {
@@ -56,26 +60,23 @@ export class Query {
     }
 
     async find() {
-        let modelClass = this.modelClass as typeof Model;
+        let modelClass = this.modelClass;
         let sql: string = 'SELECT * FROM ' + Query.quoteColumn(modelClass.TABLE_NAME);
         if (this.whereClause) {
             sql += ' WHERE ' + this.whereClause;
         }
-        if (this.orderList) {
+        if (this.orderList.length > 0) {
             sql += ' ORDER BY ' + this.orderList.join(', ');
         }
         if (this.limitOffset) {
             sql += ' LIMIT ' + this.limitOffset;
         }
         let [rows, fields] = await this.connection.execute(sql);
-        let result = new Result();
+        let result = new Result<T>();
         for (let i in rows) {
             let model = new this.modelClass(this);
-            let row = rows[i];
-            for (let columnName of row) {
-                model[modelClass.propertyName(columnName)] = row[columnName];
-            }
-            result.push(row);
+            model.migrate(rows[i]);
+            result.push(model);
         }
         return result;
     }
@@ -106,3 +107,7 @@ export class Query {
         return mysql.escape(value);
     }
 }
+
+class TestModel extends Model { }
+
+let q = new Query(null, TestModel);

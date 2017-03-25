@@ -10,6 +10,10 @@ export class Column {
     extra: Literal;
     comment: string;
 
+    value(v) {
+        return Query.quoteColumn(this.name) + ' = ' + Query.quoteValue(v);
+    }
+
     eq(value) {
         if (value === null) {
             return Query.quoteColumn(this.name) + ' IS NULL';

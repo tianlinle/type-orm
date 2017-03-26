@@ -1,5 +1,6 @@
 import { Literal } from './Literal';
 import { Query } from './Query';
+import { Expression } from './Expression';
 
 export class Column {
     property: string;
@@ -11,72 +12,44 @@ export class Column {
     comment: string;
 
     value(v) {
-        return Query.quoteColumn(this.name) + ' = ' + Query.quoteValue(v);
+        return Query.quoteId(this.name) + ' = ' + Query.quoteValue(v);
     }
 
     eq(value) {
-        if (value === null) {
-            return Query.quoteColumn(this.name) + ' IS NULL';
-        } else {
-            return Query.quoteColumn(this.name) + ' = ' + Query.quoteValue(value);
-        }
+        return Expression.eq(this, value);
     }
 
     neq(value) {
-        if (value === null) {
-            return Query.quoteColumn(this.name) + ' IS NOT NULL';
-        } else {
-            return Query.quoteColumn(this.name) + ' <> ' + Query.quoteValue(value);
-        }
+        return Expression.neq(this, value);
     }
 
     gt(value) {
-        return Query.quoteColumn(this.name) + ' > ' + Query.quoteValue(value);
+        return Expression.gt(this, value);
     }
 
     gte(value) {
-        return Query.quoteColumn(this.name) + ' >= ' + Query.quoteValue(value);
+        return Expression.gte(this, value);
     }
 
     lt(value) {
-        return Query.quoteColumn(this.name) + ' < ' + Query.quoteValue(value);
+        return Expression.lt(this, value);
     }
 
     lte(value) {
-        return Query.quoteColumn(this.name) + ' <= ' + Query.quoteValue(value);
+        return Expression.lte(this, value);
     }
 
-    in(values: Literal | any[]) {
-        if (values instanceof Literal) {
-            return Query.quoteColumn(this.name) + ' IN (' + Query.quoteValue(values) + ')';
-        }
-        let valueParts: string[] = [];
-        for (let item of values) {
-            valueParts.push(Query.quoteValue(item));
-        }
-        if (valueParts.length == 0) {
-            return '1 > 0';
-        }
-        return Query.quoteColumn(this.name) + ' IN (' + valueParts.join(', ') + ')';
+    in(values) {
+        return Expression.in(this, values);
     }
 
-    nin(values: Literal | any[]) {
-        if (values instanceof Literal) {
-            return Query.quoteColumn(this.name) + ' IN (' + Query.quoteValue(values) + ')';
-        }
-        let valueParts: string[] = [];
-        for (let item of values) {
-            valueParts.push(Query.quoteValue(item));
-        }
-        if (valueParts.length == 0) {
-            return '1 = 1';
-        }
-        return Query.quoteColumn(this.name) + ' NOT IN (' + valueParts.join(', ') + ')';
+    nin(values) {
+        return Expression.nin(this, values);
     }
 
     like(value, part: 'GENERAL' | 'LEFT' | 'RIGHT' | 'NONE' = 'GENERAL') {
         if (value instanceof Literal) {
-            return Query.quoteColumn(this.name) + ' LIKE ' + Query.quoteValue(value);
+            return Query.quoteId(this.name) + ' LIKE ' + Query.quoteValue(value);
         }
         switch (part) {
             case 'GENERAL':
@@ -91,7 +64,7 @@ export class Column {
             default:
                 break;
         }
-        return Query.quoteColumn(this.name) + ' LIKE ' + Query.quoteValue(value);
+        return Query.quoteId(this.name) + ' LIKE ' + Query.quoteValue(value);
     }
 
     static initiate(type: string, option?: { null?: boolean, default?: any, extra?: Literal, comment?: string }) {

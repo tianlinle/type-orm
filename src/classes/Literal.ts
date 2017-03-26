@@ -1,5 +1,5 @@
 export class Literal {
-    value;
+    value: string;
 
     constructor(value) {
         this.value = value;

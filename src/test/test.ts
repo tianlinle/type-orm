@@ -21,9 +21,6 @@ process.on('unhandledRejection', (reason, p) => {
 });
 
 (async () => {
-    let query = new Query(connection, AdminModel);
-    let result = await connection.query(AdminModel).where(AdminModel.COLUMNS.NAME.eq('1112')).find();
-    let row = result[0];
-    row.password = 'hahaha6';
-    row.save();
+    let result = await connection.execute('insert into tb_admin2(id, name,password) values("a",1,1),("b",1,1)');
+    console.log(result);
 })();

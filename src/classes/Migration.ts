@@ -39,7 +39,7 @@ export class Migration {
                 let row: DescTableResult = descTableResults[i];
                 existedColumnMap[row.COLUMN_NAME] = row;
                 if (!definedColumnMap[row.COLUMN_NAME]) {
-                    alterParts.push('DROP COLUMN ' + Query.quoteColumn(row.COLUMN_NAME));
+                    alterParts.push('DROP COLUMN ' + Query.quoteId(row.COLUMN_NAME));
                 }
             }
 
@@ -55,7 +55,7 @@ export class Migration {
                         !Literal.isEqual(existedColumn.COLUMN_DEFAULT, definedColumnDefault) ||
                         !Literal.isEqual(existedColumn.EXTRA, definedColumn.extra) ||
                         (existedColumn.IS_NULLABLE == 'YES') != definedColumn.null) {
-                        alterParts.push('CHANGE COLUMN ' + Query.quoteColumn(existedColumn.COLUMN_NAME) + ' ' + Migration.getColumnStatement(definedColumn));
+                        alterParts.push('CHANGE COLUMN ' + Query.quoteId(existedColumn.COLUMN_NAME) + ' ' + Migration.getColumnStatement(definedColumn));
                     }
                 }
             }
@@ -83,12 +83,12 @@ export class Migration {
 
             if ('0_' + this.query.modelClass.PRIMARY_COLUMN.name != existedPrimary) {
                 alterParts.push('DROP PRIMARY KEY');
-                alterParts.push('ADD PRIMARY KEY (' + Query.quoteColumn(this.query.modelClass.PRIMARY_COLUMN.name) + ')');
+                alterParts.push('ADD PRIMARY KEY (' + Query.quoteId(this.query.modelClass.PRIMARY_COLUMN.name) + ')');
             }
 
             for (let keyName in existedIndexNames) {
                 if (!definedIndexNames[keyName]) {
-                    alterParts.push('DROP INDEX ' + existedIndexNames[keyName]);
+                    alterParts.push('DROP INDEX ' + Query.quoteId(existedIndexNames[keyName]));
                 }
             }
 
@@ -98,7 +98,7 @@ export class Migration {
                     let indexType: string = index.type == 'UNIQUE' ? 'UNIQUE INDEX' : 'INDEX';
                     let columnParts: string[] = [];
                     for (let column of index.columns) {
-                        columnParts.push(Query.quoteColumn(column.name));
+                        columnParts.push(Query.quoteId(column.name));
                     }
                     alterParts.push('ADD ' + indexType + '(' + columnParts.join(', ') + ')');
                 }
@@ -110,6 +110,9 @@ export class Migration {
         return sql;
     }
 
+    /**
+     * only support InnoDB for safe increment id
+     */
     async showCreateTable() {
         let columnParts: string[] = [];
         for (let i in this.query.modelClass.COLUMNS) {
@@ -118,15 +121,15 @@ export class Migration {
         for (let i in this.query.modelClass.INDEXES) {
             columnParts.push(Migration.getIndexStatement(this.query.modelClass.INDEXES[i]));
         }
-        columnParts.push('PRIMARY KEY (' + Query.quoteColumn(this.query.modelClass.PRIMARY_COLUMN.name) + ')');
-        return 'CREATE TABLE ' + Query.quoteColumn(this.query.modelClass.TABLE_NAME) + '(' + columnParts.join(', ') + ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4';
+        columnParts.push('PRIMARY KEY (' + Query.quoteId(this.query.modelClass.PRIMARY_COLUMN.name) + ')');
+        return 'CREATE TABLE ' + Query.quoteId(this.query.modelClass.TABLE_NAME) + '(' + columnParts.join(', ') + ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4';
     }
 
     static getIndexStatement(index: Index) {
         let statement: string = '';
         let parts: string[] = [];
         for (let column of index.columns) {
-            parts.push(Query.quoteColumn(column.name));
+            parts.push(Query.quoteId(column.name));
         }
         if (index.type == 'UNIQUE') {
             return 'UNIQUE INDEX (' + parts.join(', ') + ')';
@@ -136,7 +139,7 @@ export class Migration {
 
     static getColumnStatement(column: Column) {
         let parts: string[] = [];
-        parts.push(Query.quoteColumn(column.name));
+        parts.push(Query.quoteId(column.name));
         parts.push(column.type);
         parts.push(column.null ? 'NULL' : 'NOT NULL');
         if (!(column.default === null && !column.null)) {
